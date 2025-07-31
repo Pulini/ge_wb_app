@@ -1,0 +1,2 @@
+/Users/panzhuoxu/IdeaProjects/ge_wb_app/android/app/.cxx/Debug/2f5s4m6z/x86/CMakeFiles/edit_cache.dir
+/Users/panzhuoxu/IdeaProjects/ge_wb_app/android/app/.cxx/Debug/2f5s4m6z/x86/CMakeFiles/rebuild_cache.dir
