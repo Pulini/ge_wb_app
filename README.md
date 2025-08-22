@@ -42,8 +42,8 @@ requestBluetoothPermission(
   allGranted: () {
     // 所有权限已授予
   },
-  hasDenied: (permission) {
-    // permission 为失败项：location / bluetoothConnect / bluetoothScan / bluetooth / bluetoothAdvertise
+  hasDenied: (Map<String, bool> result) {
+    // 部分权限没有授予 
   },
 );
 ```

@@ -1,6 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ge_wb_app/utils/ext.dart';
+import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../main.dart';
 import 'consts.dart';
@@ -20,46 +25,21 @@ Future<bool> requestCameraPermission() async =>
 /// 蓝牙权限  bluetooth
 /// 蓝牙广播权限  bluetoothAdvertise
 requestBluetoothPermission({
-  required Function() allGranted,
-  required Function(String permission) hasDenied,
-}) async {
+  required Function(Map<String, bool> result) callback,
+}) {
   [
     Permission.location,
     Permission.bluetoothConnect,
     Permission.bluetoothScan,
     Permission.bluetooth,
     Permission.bluetoothAdvertise,
-  ].request().then((statuses) {
-    logger.f('''
-  location=${statuses[Permission.location]!.isGranted}
-  bluetoothConnect=${statuses[Permission.bluetoothConnect]!.isGranted}
-  bluetoothScan=${statuses[Permission.bluetoothScan]!.isGranted}
-  bluetooth=${statuses[Permission.bluetooth]!.isGranted}
-  bluetoothAdvertise=${statuses[Permission.bluetoothAdvertise]!.isGranted}
-  ''');
-    if (statuses[Permission.location]!.isGranted &&
-        statuses[Permission.bluetoothConnect]!.isGranted &&
-        statuses[Permission.bluetoothScan]!.isGranted &&
-        statuses[Permission.bluetooth]!.isGranted &&
-        statuses[Permission.bluetoothAdvertise]!.isGranted) {
-      allGranted.call();
-    } else {
-      if (!statuses[Permission.location]!.isGranted) {
-        hasDenied.call('location');
-      }
-      if (!statuses[Permission.bluetoothConnect]!.isGranted) {
-        hasDenied.call('bluetoothConnect');
-      }
-      if (!statuses[Permission.bluetoothScan]!.isGranted) {
-        hasDenied.call('bluetoothScan');
-      }
-      if (!statuses[Permission.bluetooth]!.isGranted) {
-        hasDenied.call('bluetooth');
-      }
-      if (!statuses[Permission.bluetoothAdvertise]!.isGranted) {
-        hasDenied.call('bluetoothAdvertise');
-      }
-    }
+  ].request().then((result) {
+    logger.f(result);
+    var map = <String, bool>{};
+    result.forEach((k, v) {
+      map[k.toString()] = v.isGranted;
+    });
+    callback.call(map);
   });
 }
 
@@ -201,15 +181,11 @@ Future<bool> endScanBluetooth() async =>
 
 ///连接蓝牙
 ///deviceMac：设备MAC
-///connectCallback：连接结果
 /// 0:连接成功
 /// 1:连接失败
 /// 2:未找到对应设备
 /// 3:蓝牙处于关闭状态
-Future<int> connectBluetooth({
-  required String deviceMac,
-  required Function(int type) connectCallback,
-}) async =>
+Future<int> connectBluetooth({required String deviceMac}) async =>
     await _bluetoothChannel.invokeMethod('ConnectBluetooth', deviceMac);
 
 ///关闭蓝牙
@@ -228,7 +204,8 @@ Future<bool> closeBluetooth(String deviceMac) async =>
 /// "DeviceIsConnected":(bool)当前状态是否已连接
 /// }
 Future<List<Map>> getScannedDevices() async => [
-      for (var json in await _bluetoothChannel.invokeMethod('GetScannedDevices'))
+      for (var json
+          in await _bluetoothChannel.invokeMethod('GetScannedDevices'))
         {
           'DeviceName': json['DeviceName'],
           'DeviceMAC': json['DeviceMAC'],
@@ -259,6 +236,11 @@ Future<int> sendLabel(List<Uint8List> label) async =>
 
 ///地磅秤设备监听
 /// weighbridgeState:设备状态
+///   WEIGHT_MSG_DEVICE_DETACHED,
+///   WEIGHT_MSG_DEVICE_NOT_CONNECTED,
+///   WEIGHT_MSG_OPEN_DEVICE_SUCCESS,
+///   WEIGHT_MSG_OPEN_DEVICE_FAILED,
+///   WEIGHT_MSG_READ_ERROR,
 /// weight:称重结果
 weighbridgeListener({
   required Function(String) weighbridgeState,
@@ -318,4 +300,54 @@ usbListener({
 ///filePath:文件路径
 openFile(String filePath) {
   const MethodChannel(channelUsbA2F).invokeMethod('OpenFile', filePath);
+}
+
+//照片选择器
+takePhoto(Function(File) callback) {
+  showCupertinoModalPopup(
+    context: Get.overlayContext!,
+    builder: (BuildContext context) => CupertinoActionSheet(
+      title: Text('选择照片'),
+      message: Text('选择要进行人脸对比的照片'),
+      actions: <CupertinoActionSheetAction>[
+        CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () {
+            Navigator.pop(context);
+            ImagePicker()
+                .pickImage(
+                  imageQuality: 75,
+                  maxWidth: 700,
+                  maxHeight: 700,
+                  source: ImageSource.camera,
+                )
+                .then((photo) => callback.call(File(photo!.path)));
+          },
+          child: Text('拍照'),
+        ),
+        CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () {
+            Navigator.pop(context);
+            ImagePicker()
+                .pickImage(
+                    imageQuality: 75,
+                    maxWidth: 700,
+                    maxHeight: 700,
+                    source: ImageSource.gallery)
+                .then((v) => v == null ? null : callback.call(File(v.path)));
+          },
+          child: Text('相册'),
+        ),
+      ],
+      cancelButton: CupertinoActionSheetAction(
+        isDefaultAction: true,
+        onPressed: () => Navigator.pop(context),
+        child: Text(
+          '取消',
+          style: const TextStyle(color: Colors.grey),
+        ),
+      ),
+    ),
+  );
 }

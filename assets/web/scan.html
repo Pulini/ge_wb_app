@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>条码列表</title>
+    <style>
+
+        .container {
+            margin: auto;
+            display: flex;
+            width: 100%;
+            max-width: 100%;
+            padding: 20px;
+        }
+
+        .button {
+            margin: auto;
+            color: #fff;
+            background: #09f;
+            border: 20px;
+            cursor: pointer;
+            padding: 10px 20px;
+            border-radius: 25px;
+        }
+
+
+        #livenFaceVerify {
+            display: flex;
+        }
+
+        #livenFaceVerify img {
+            width: 200px;
+            height: 200px;
+            margin: auto;
+            object-fit: cover; /* 保持图片比例 */
+            background-color: #0099ff;
+        }
+
+        #livenFaceVerify img.visible {
+            display: block;
+        }
+
+        .inputContainer {
+            display: flex;
+            width: 100%;
+            max-width: 100%;
+            padding: 20px;
+        }
+
+        .textInput {
+            padding: 8px;
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <button id="faceVerify" class="button" onclick="faceVerify()">活体认证</button>
+</div>
+
+<div id="livenFaceVerify">
+    <img id="face1" width="200" height="200" alt="识别人" src="../images/ic_logo.png">
+    <img id="face2" width="200" height="200" alt="识别结果" src="../images/ic_logo.png">
+</div>
+<div class="container">
+    <button id="camera" class="button" onclick="cameraRequest()">获取相机权限</button>
+    <button id="bluetooth" class="button" onclick="bluetoothRequest()">获取蓝牙权限</button>
+    <button id="weightDevice" class="button" onclick="openWeightDevice()">打开地磅通讯通道</button>
+</div>
+<div class="container">
+    <button id="bluetoothIsEnable" class="button" onclick="bluetoothIsEnable()">蓝牙是否开启</button>
+    <button id="bluetoothIsLocationOn" class="button" onclick="bluetoothIsLocationOn()">位置权限是否开启</button>
+    <button id="scanBluetooth" class="button" onclick="scanBluetooth()">扫描蓝牙</button>
+    <button id="endScanBluetooth" class="button" onclick="endScanBluetooth()">停止扫描</button>
+    <button id="getScannedDevices" class="button" onclick="getScannedDevices()">获取已扫设备</button>
+</div>
+<div class="inputContainer">
+    <input type="text" id="inputMac" class="textInput" placeholder="输入Mac地址">
+    <button id="connectBluetooth" class="button" onclick="connectBluetooth()">连接蓝牙</button>
+    <button id="closeBluetooth" class="button" onclick="closeBluetooth()">关闭蓝牙</button>
+</div>
+<div class="inputContainer">
+    <input type="text" id="inputLabelByteList" class="textInput" placeholder="输入标签数据">
+    <button id="send" class="button" onclick="sendLabelData()">发送标签数据</button>
+</div>
+
+<h4 id="log" style="margin: 20px"></h4>
+
+
+<script>
+
+    function addLog(text) {
+        const imgElement = document.getElementById('log');
+        if (imgElement) {
+            imgElement.innerHTML = imgElement.innerHTML += `${text} <br>`;
+        }
+    }
+
+    // 页面加载完成后初始化图片
+    document.addEventListener('DOMContentLoaded', function () {
+        const img1 = document.getElementById('face1');
+        const img2 = document.getElementById('face2');
+        img1.src = '../images/ic_logo.png';
+        img2.src = '../images/ic_logo.png';
+        img1.style.display = 'block';
+        img2.style.display = 'block';
+    });
+
+    function faceVerify() {
+        StartLivenFaceVerify.postMessage('');
+    }
+
+    function setFace1(base64Image) {
+        const imgElement = document.getElementById('face1');
+        if (imgElement) {
+            imgElement.src = base64Image;
+            imgElement.style.display = 'block';
+        }
+    }
+
+    function setFace2(base64Image) {
+        const imgElement = document.getElementById('face2');
+        if (imgElement) {
+            imgElement.src = base64Image;
+            imgElement.style.display = 'block';
+        }
+    }
+
+    function cameraRequest() {
+        RequestCameraPermission.postMessage('');
+    }
+
+
+    function bluetoothRequest() {
+        RequestBluetoothPermission.postMessage('');
+    }
+
+    function permissionResult(map) {
+        for (const [permission, isGranted] of Object.entries(map)) {
+            addLog(`${permission}: ${isGranted ? '✅ 已授权' : '❌ 未授权'}`);
+        }
+    }
+
+
+    function openWeightDevice() {
+        OpenWeightDevice.postMessage('');
+    }
+
+
+    function scanBluetooth() {
+        ScanBluetooth.postMessage('');
+    }
+
+    function endScanBluetooth() {
+        EndScanBluetooth.postMessage('');
+    }
+
+    function connectBluetooth() {
+        const inputMac = document.getElementById('inputMac');
+        ConnectBluetooth.postMessage(inputMac.textContent);
+    }
+
+    function closeBluetooth() {
+        const inputMac = document.getElementById('inputMac');
+        CloseBluetooth.postMessage(inputMac.textContent);
+    }
+
+    function getScannedDevices() {
+        GetScannedDevices.postMessage('');
+    }
+
+    function bluetoothIsEnable() {
+        BluetoothIsEnable.postMessage('');
+    }
+
+    function bluetoothIsLocationOn() {
+        BluetoothIsLocationOn.postMessage('');
+    }
+    function sendLabelData() {
+        const inputLabelByteList = document.getElementById('inputLabelByteList');
+        if (inputLabelByteList) {
+            SendLabelData.postMessage(inputLabelByteList.textContent);
+        }
+    }
+
+
+</script>
+</body>
+</html>

@@ -9,3 +9,4 @@ const channelWeighbridgeA2F = 'channel_weighbridge_android_to_flutter';
 const channelPrinterA2F = 'channel_printer_android_to_flutter';
 const channelPrinterF2A = 'channel_printer_flutter_to_android';
 const webUrl = 'https://wb.goldemperor.com:9096/m?xwl=scan/scan';
+const webSrc = 'assets/web/scan.html';

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 extension Uint8ListExt on Uint8List {
@@ -15,4 +16,9 @@ extension Uint8ListExt on Uint8List {
   }
 
   String toBase64() => base64Encode(this);
+}
+//File扩展方法
+extension FileExt on File {
+  //图片转 base64
+  String toBase64() => base64Encode(readAsBytesSync());
 }
