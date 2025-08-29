@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:ge_wb_app/utils/consts.dart';
 import 'package:ge_wb_app/utils/dialogs.dart';
 import 'package:ge_wb_app/utils/ext.dart';
+import 'package:ge_wb_app/utils/tsc_util.dart';
 import 'package:ge_wb_app/utils/util.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:webviewx_plus/webviewx_plus.dart';
@@ -28,10 +28,9 @@ class _WebAppState extends State<WebApp> {
     required List args,
   }) async {
     try {
-      // await webviewController.callJsMethod('app.getCode',args);
       debugPrint(
-          '-----------------callJsMethod method: $method with args: $args');
-      await webviewController.callJsMethod(method, args);
+          '-----------------callJsMethod method: app.$method with args: $args');
+      await webviewController.callJsMethod('app.$method', args);
     } catch (e) {
       debugPrint(e.toString());
     }
@@ -120,14 +119,15 @@ class _WebAppState extends State<WebApp> {
   _openWeightDevice() async => await weighbridgeOpen();
 
   _scanBluetooth() {
-    logger.f('scanBluetooth=${scanBluetooth()}');
+    scanBluetooth().then((v) => logger.f('scanBluetooth=$v'));
   }
 
   _endScanBluetooth() {
-    logger.f('endScanBluetooth=${endScanBluetooth()}');
+    endScanBluetooth().then((v) => logger.f('endScanBluetooth=$v'));
   }
 
   _connectBluetooth(String mac) async {
+    debugPrint('----------mac=$mac');
     var type = await connectBluetooth(deviceMac: mac);
     callJsMethod(
       method: 'addLog',
@@ -147,11 +147,20 @@ class _WebAppState extends State<WebApp> {
 
   _getScannedDevices() async {
     var devices = await getScannedDevices();
-    for (var d in devices) {
+    if (devices.isEmpty) {
       callJsMethod(
         method: 'addLog',
-        args: ['已扫描到的蓝牙设备：$d}'],
+        args: ['已扫设备列表为空'],
       );
+    } else {
+      for (var d in devices) {
+        callJsMethod(
+          method: 'addLog',
+          args: [
+            '已扫描到的蓝牙设备: \n name:${d['DeviceName']} \n mac:${d['DeviceMAC']} \n isBond:${d['DeviceBondState']} \n isConnected:${d['DeviceIsConnected']} \n'
+          ],
+        );
+      }
     }
   }
 
@@ -171,9 +180,18 @@ class _WebAppState extends State<WebApp> {
     );
   }
 
-  _sendLabel(List<Uint8List> labelDate) {
-    sendLabel(labelDate);
+  _sendDevicePixelRatio() {
+    debugPrint('devicePixelRatio=${MediaQuery.of(context).devicePixelRatio}');
+    callJsMethod(
+      method: 'setPixelRatio',
+      args: [MediaQuery.of(context).devicePixelRatio],
+    );
   }
+
+  _sendLabel(dynamic json) => sendLabel(handleJsByteArray(json));
+
+  // _sendLabel(dynamic json) => createLabel(json).then((bytes) => sendLabel(bytes));
+
   @override
   void initState() {
     usbListener(
@@ -235,18 +253,20 @@ class _WebAppState extends State<WebApp> {
         method: 'addLog',
         args: ['蓝牙已开启'],
       ),
-      deviceFind: (device) => callJsMethod(
+      deviceFind: (d) => callJsMethod(
         method: 'addLog',
-        args: ['找到蓝牙设备：$device'],
+        args: [
+          '找到蓝牙设备: \n name:${d['DeviceName']} \n mac:${d['DeviceMAC']} \n isBond:${d['DeviceBondState']} \n isConnected:${d['DeviceIsConnected']} \n'
+        ],
       ),
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      webviewController.loadContent(
-        webSrc,
-        sourceType: SourceType.html,
-        fromAssets: true,
-      );
-    });
+    // WidgetsBinding.instance.addPostFrameCallback((_) {
+    //   webviewController.loadContent(
+    //     webSrc,
+    //     sourceType: SourceType.html,
+    //     fromAssets: true,
+    //   );
+    // });
     super.initState();
   }
 
@@ -273,16 +293,18 @@ class _WebAppState extends State<WebApp> {
                     padding: EdgeInsets.only(left: 10, right: 10),
                     child: WebViewX(
                       key: const ValueKey('webviewx'),
-                      // initialContent: webUrl,
-                      initialSourceType: SourceType.html,
+                      initialContent: webUrl,
+                      initialSourceType: SourceType.url,
                       height: screenSize.height,
                       width: screenSize.width,
                       onWebViewCreated: (controller) =>
                           webviewController = controller,
                       onPageStarted: (src) =>
                           debugPrint('onPageStarted: $src\n'),
-                      onPageFinished: (src) =>
-                          debugPrint('onPageFinished: $src\n'),
+                      onPageFinished: (src) {
+                        debugPrint('onPageFinished: $src\n');
+                        _sendDevicePixelRatio();
+                      },
                       dartCallBacks: {
                         DartCallback(
                           name: 'StartLivenFaceVerify',
@@ -329,8 +351,12 @@ class _WebAppState extends State<WebApp> {
                           callBack: (_) => _bluetoothIsLocationOn(),
                         ),
                         DartCallback(
+                          name: 'GetDevicePixelRatio',
+                          callBack: (_) => _sendDevicePixelRatio(),
+                        ),
+                        DartCallback(
                           name: 'SendLabelData',
-                          callBack: (labelDate) => _sendLabel((labelDate as List<Uint8List>)),
+                          callBack: (labelDate) => _sendLabel(labelDate),
                         ),
                       },
                       webSpecificParams: const WebSpecificParams(
@@ -347,45 +373,57 @@ class _WebAppState extends State<WebApp> {
                   ),
                 ),
                 Container(
-                  width: 240,
+                  width: 400,
                   margin: const EdgeInsets.all(5),
                   height: 40,
-                  child: TextField(
-                    controller: controller,
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.only(
-                        top: 0,
-                        bottom: 0,
-                        left: 15,
-                        right: 10,
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[300],
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(
-                          color: Colors.transparent,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: controller,
+                          decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.only(
+                              top: 0,
+                              bottom: 0,
+                              left: 15,
+                              right: 10,
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[300],
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              borderSide: const BorderSide(
+                                color: Colors.transparent,
+                              ),
+                            ),
+                            border: const OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius.all(Radius.circular(20)),
+                            ),
+                            hintStyle: const TextStyle(color: Colors.grey),
+                            prefixIcon: IconButton(
+                              onPressed: () => controller.clear(),
+                              icon: const Icon(
+                                Icons.replay_circle_filled,
+                                color: Colors.red,
+                              ),
+                            ),
+                            suffixIcon: button(
+                              text: '发送条码',
+                              click: () => callJsMethod(
+                                method: 'addLog',
+                                args: ['已扫条码：${controller.text}'],
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                      border: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(20)),
-                      ),
-                      hintStyle: const TextStyle(color: Colors.grey),
-                      prefixIcon: IconButton(
-                        onPressed: () => controller.clear(),
-                        icon: const Icon(
-                          Icons.replay_circle_filled,
-                          color: Colors.red,
-                        ),
-                      ),
-                      suffixIcon: button(
-                        text: '发送条码',
-                        click: () => callJsMethod(
-                          method: 'addLog',
-                          args: ['已扫条码：${controller.text}'],
-                        ),
-                      ),
-                    ),
+                      SizedBox(width: 20),
+                      button(
+                        text: '重新加载',
+                        click: () => webviewController.reload(),
+                      )
+                    ],
                   ),
                 ),
               ],
@@ -399,5 +437,4 @@ class _WebAppState extends State<WebApp> {
     webviewController.dispose();
     super.dispose();
   }
-
 }

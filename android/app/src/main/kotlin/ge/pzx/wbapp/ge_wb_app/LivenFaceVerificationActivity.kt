@@ -1,7 +1,6 @@
 package ge.pzx.wbapp.ge_wb_app
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
@@ -13,11 +12,13 @@ import android.util.Log
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.postDelayed
 import com.huawei.hms.mlsdk.common.MLFrame
 import com.huawei.hms.mlsdk.faceverify.MLFaceVerificationAnalyzerFactory
 import com.huawei.hms.mlsdk.faceverify.MLFaceVerificationAnalyzerSetting
 import com.huawei.hms.mlsdk.livenessdetection.MLLivenessCaptureResult
+import com.huawei.hms.mlsdk.livenessdetection.MLLivenessDetectInfo
 import com.huawei.hms.mlsdk.livenessdetection.MLLivenessDetectView
 import com.huawei.hms.mlsdk.livenessdetection.OnMLLivenessDetectCallback
 import ge.pzx.wbapp.ge_wb_app.dialogs.TipsDialog
@@ -25,9 +26,6 @@ import ge.pzx.wbapp.ge_wb_app.utils.FACE_VERIFY_FAIL_ERROR
 import ge.pzx.wbapp.ge_wb_app.utils.FACE_VERIFY_FAIL_NOT_LIVE
 import ge.pzx.wbapp.ge_wb_app.utils.FACE_VERIFY_FAIL_NOT_ME
 import ge.pzx.wbapp.ge_wb_app.utils.FACE_VERIFY_SUCCESS
-import ge.pzx.wbapp.ge_wb_app.utils.display
-import ge.pzx.wbapp.ge_wb_app.utils.dp2px
-import ge.pzx.wbapp.ge_wb_app.utils.isPad
 import ge.pzx.wbapp.ge_wb_app.dialogs.InquiryDialog
 
 
@@ -38,7 +36,7 @@ import ge.pzx.wbapp.ge_wb_app.dialogs.InquiryDialog
  * Github : https://github.com/Pulini
  * Remark :华为HiAI引擎 人脸活体验证+人脸对比
  */
-class LivenFaceVerificationActivity : Activity() {
+class LivenFaceVerificationActivity : AppCompatActivity() {
 
     companion object {
         lateinit var verifyResult: (Int, Bitmap?) -> Unit
@@ -73,6 +71,7 @@ class LivenFaceVerificationActivity : Activity() {
     //活体检测插件
     private var mlLivenDetectView: MLLivenessDetectView? = null
 
+
     //活体检测插件承载
     private val previewContainer: FrameLayout by lazy { findViewById(R.id.surface_layout) }
 
@@ -94,25 +93,16 @@ class LivenFaceVerificationActivity : Activity() {
     //活体检测结果bitmap
     private var faceBitmap: Bitmap? = null
 
-    private var errorCode= FACE_VERIFY_SUCCESS
+    private var errorCode = FACE_VERIFY_SUCCESS
 
     @SuppressLint("SourceLockedOrientationActivity")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         bundle = savedInstanceState
-        //判断是否是平板
-        if (isPad()) {
-            //加载平板的主界面并强制横屏
-            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-            setContentView(R.layout.activity_liveness_custom_detection_pad)
-        } else {
-            //加载手机的主界面并强制竖屏
-            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-            setContentView(R.layout.activity_liveness_custom_detection_phone)
-        }
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        setContentView(R.layout.activity_liveness_custom_detection)
         ivBack.setOnClickListener { finish() }
         previewContainer.postDelayed(300) {
-            //预览界面加载存在位置偏移bug,需要延迟加载预览界面
             startFaceVerification()
         }
     }
@@ -148,19 +138,10 @@ class LivenFaceVerificationActivity : Activity() {
 
 
     private fun initLivingDetectView(callback: (Int, Bitmap?) -> Unit): MLLivenessDetectView {
-        val display = display()
         return MLLivenessDetectView.Builder()
             .setContext(this)
             .setOptions(MLLivenessDetectView.DETECT_MASK)
-            .setFaceFrameRect(
-                //平板和手机区分检测区域大小
-                Rect(
-                    0,
-                    0,
-                    display.widthPixels,
-                    if (isPad()) display.heightPixels else dp2px(480f)
-                )
-            )
+            .setFaceFrameRect(Rect(0, 0, 0, 1000))
             .setDetectCallback(object : OnMLLivenessDetectCallback {
                 //活体检测完成
                 override fun onCompleted(result: MLLivenessCaptureResult) {
@@ -168,7 +149,7 @@ class LivenFaceVerificationActivity : Activity() {
                         //活体检测成功
                         callback.invoke(FACE_VERIFY_SUCCESS, result.bitmap)
                     } else {
-                        errorCode= FACE_VERIFY_FAIL_NOT_LIVE
+                        errorCode = FACE_VERIFY_FAIL_NOT_LIVE
                         //活体检测失败
                         showFailDialog(getString(R.string.liven_detection_liven_fail))
                     }
@@ -177,14 +158,26 @@ class LivenFaceVerificationActivity : Activity() {
                 //活体检测异常
                 override fun onError(error: Int) {
                     Log.e("Pan", "活体检测异常：$error")
-                    errorCode= FACE_VERIFY_FAIL_ERROR
+                    errorCode = FACE_VERIFY_FAIL_ERROR
                     showFailDialog(
                         String.format(getString(R.string.liven_detection_liven_error), error)
                     )
                 }
 
-                override fun onInfo(infoCode: Int, bundle: Bundle) {}
-                override fun onStateChange(state: Int, bundle: Bundle) {}
+                override fun onInfo(infoCode: Int, bundle: Bundle) {
+                    Log.e("Pan", "infoCode=$infoCode")
+                    tvSimilarity.text = when (infoCode) {
+                        MLLivenessDetectInfo.NO_FACE_WAS_DETECTED -> "未识别到人脸"
+                        MLLivenessDetectInfo.MASK_WAS_DETECTED -> "检测到口罩"
+                        MLLivenessDetectInfo.SUNGLASS_WAS_DETECTED -> "检测到墨镜"
+                        MLLivenessDetectInfo.FACE_ROTATION -> "脸部旋转"
+                        else -> ""
+                    }
+                }
+
+                override fun onStateChange(state: Int, bundle: Bundle) {
+                    Log.e("Pan", "state=$state")
+                }
             })
             .build()
             .apply {
@@ -239,14 +232,14 @@ class LivenFaceVerificationActivity : Activity() {
                                     finish()
                                 }
                             } else {
-                                errorCode= FACE_VERIFY_FAIL_NOT_ME
+                                errorCode = FACE_VERIFY_FAIL_NOT_ME
                                 showFailDialog(getString(R.string.liven_detection_photo_not_me))
                             }
                         }
                     }
                 }.addOnFailureListener {
                     Log.e("Pan", it.toString())
-                    errorCode= FACE_VERIFY_FAIL_NOT_ME
+                    errorCode = FACE_VERIFY_FAIL_NOT_ME
                     showFailDialog(getString(R.string.liven_detection_photo_not_me))
                 }
         } catch (e: RuntimeException) {
@@ -289,4 +282,6 @@ class LivenFaceVerificationActivity : Activity() {
         super.onResume()
         mlLivenDetectView?.onResume()
     }
+
+
 }

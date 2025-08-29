@@ -190,10 +190,16 @@
         BluetoothIsLocationOn.postMessage('');
     }
     function sendLabelData() {
-        const inputLabelByteList = document.getElementById('inputLabelByteList');
-        if (inputLabelByteList) {
-            SendLabelData.postMessage(inputLabelByteList.textContent);
-        }
+        // const inputLabelByteList = document.getElementById('inputLabelByteList');
+        // if (inputLabelByteList) {
+        //     SendLabelData.postMessage(inputLabelByteList.textContent);
+        // }
+
+        // 创建Uint8Array数据
+        const labelData = new Uint8Array([0x1B, 0x40, 0x1D, 0x28, 0x4C]);
+        // 转换为数组并序列化为JSON字符串发送
+        SendLabelData.postMessage(JSON.stringify(Array.from(labelData)));
+
     }
 
 

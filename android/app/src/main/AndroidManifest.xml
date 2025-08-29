@@ -29,7 +29,7 @@
     <application
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher_round"
-        android:label="金帝">
+        android:label="金帝WebBuilderApp">
 
         <activity
             android:name=".MainActivity"
@@ -87,7 +87,6 @@
 
         <activity
             android:name="com.yalantis.ucrop.UCropActivity"
-            android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
