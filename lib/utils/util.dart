@@ -1,13 +1,21 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:ge_wb_app/app_init_service.dart';
+import 'package:ge_wb_app/do_http/response/user_info.dart';
+import 'package:ge_wb_app/do_http/response/version_info.dart';
+import 'package:ge_wb_app/do_http/web_api.dart';
 import 'package:ge_wb_app/utils/ext.dart';
+import 'package:ge_wb_app/widgets/dialogs.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../main.dart';
+import 'package:sqflite/sqflite.dart';
 import 'consts.dart';
 
 /// 获取相机权限
@@ -59,7 +67,7 @@ livenFaceVerify({
     verifySuccess.call((v as Uint8List).toBase64());
   }).catchError((e) {
     logger.f('livenFaceVerify：fail');
-    verifyFail.call(e);
+    verifyFail.call(e.toString());
   });
 }
 
@@ -350,4 +358,149 @@ takePhoto(Function(File) callback) {
       ),
     ),
   );
+}
+
+//显示SnackBar
+showSnackBar({
+  bool? isWarning,
+  String? title,
+  required String message,
+}) {
+  isWarning ??= false;
+  title ??= isWarning
+      ? 'snack_bar_default_wrong'.tr
+      : 'dialog_default_title_information'.tr;
+  Get.snackbar(
+    title,
+    message,
+    margin: const EdgeInsets.all(10),
+    snackPosition: SnackPosition.BOTTOM,
+    backgroundColor: isWarning == true
+        ? Colors.redAccent.shade100
+        : Colors.greenAccent.shade100,
+    colorText: isWarning == true ? Colors.white : Colors.blue.shade900,
+  );
+}
+
+//隐藏键盘而不丢失文本字段焦点：
+hideKeyBoard() {
+  SystemChannels.textInput.invokeMethod('TextInput.hide');
+}
+
+loggerF(Map<String, dynamic> map) {
+  if (map.toString().length > 500) {
+    map['日志类型'] = '异步打印日志';
+    compute(_logF, map);
+  } else {
+    map['日志类型'] = '直接打印日志';
+    logger.f(map);
+  }
+}
+
+_logF(Map<String, dynamic> data) {
+  logger.f(data);
+}
+
+// 保存SP数据
+spSave(String key, Object value) {
+  if (value is String) {
+    sharedPreferences().setString(key, value);
+    logger.d('save\nclass:${value.runtimeType}\nkey:$key\nvalue:$value');
+  } else if (value is int) {
+    sharedPreferences().setInt(key, value);
+    logger.d('save\nclass:${value.runtimeType}\nkey:$key\nvalue:$value');
+  } else if (value is double) {
+    sharedPreferences().setDouble(key, value);
+    logger.d('save\nclass:${value.runtimeType}\nkey:$key\nvalue:$value');
+  } else if (value is bool) {
+    sharedPreferences().setBool(key, value);
+    logger.d('save\nclass:${value.runtimeType}\nkey:$key\nvalue:$value');
+  } else if (value is List<String>) {
+    sharedPreferences().setStringList(key, value);
+    logger.d('save\nclass:${value.runtimeType}\nkey:$key\nvalue:$value');
+  } else {
+    logger.e('error\nclass:${value.runtimeType}');
+  }
+}
+
+// 获取SP数据
+dynamic spGet(String key) {
+  try {
+    var value = sharedPreferences().get(key);
+    logger.d('read\nclass:${value.runtimeType}\nkey:$key\nvalue:$value');
+    switch (value.runtimeType) {
+      case const (String):
+        return value ?? '';
+      case const (int):
+        return value ?? 0;
+      case const (double):
+        return value ?? 0.0;
+      case const (bool):
+        return value ?? false;
+      case const (List<Object?>):
+        return sharedPreferences().getStringList(key) ?? [];
+      default:
+        return value;
+    }
+  } catch (e) {
+    debugPrint('$key--------read sp error-------');
+    return null;
+  }
+}
+
+UserInfo? getUserInfo() {
+  try {
+    var spUserInfo = sharedPreferences().get(spSaveUserInfo) as String?;
+    debugPrint('spUserInfo=$spUserInfo');
+    if (spUserInfo != null) {
+      return UserInfo.fromJson(jsonDecode(spUserInfo));
+    }
+  } on Error catch (e) {
+    logger.e(e.runtimeType);
+  } on Exception catch (e) {
+    logger.e(e.runtimeType);
+  }
+  return null;
+}
+
+//更新app
+upData() {
+  httpGet(
+    method: webApiCheckVersion,
+    loading: '正在检查版本更新...',
+  ).then((versionInfoCallback) {
+    if (versionInfoCallback.resultCode == resultSuccess) {
+      logger.i(packageInfo);
+      var versionInfo = VersionInfo.fromJson(versionInfoCallback.data);
+      if (packageInfo().version.replaceAll('.', '').toIntTry() <
+          versionInfo.versionName!.replaceAll('.', '').toIntTry()) {
+        doUpdate(version: versionInfo);
+      } else {
+        showSnackBar(
+          title: '版本更新',
+          message: '当前已是最新版本',
+        );
+      }
+    } else {
+      errorDialog(content: versionInfoCallback.message);
+    }
+  });
+}
+
+Future<Database> openDb() async {
+  return openDatabase(join(await getDatabasesPath(), jdDatabase));
+}
+
+/// 获取屏幕逻辑尺寸（考虑了设备像素比）
+Size getScreenSize() {
+  final view = WidgetsBinding.instance.platformDispatcher.implicitView;
+  if (view != null) {
+    final physicalSize = view.physicalSize;
+    final devicePixelRatio = view.devicePixelRatio;
+    return physicalSize / devicePixelRatio;
+  } else {
+    final physicalSize = View.of(Get.context!).physicalSize;
+    final devicePixelRatio = View.of(Get.context!).devicePixelRatio;
+    return physicalSize / devicePixelRatio;
+  }
 }

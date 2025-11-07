@@ -144,7 +144,7 @@ Uint8List _tscBarCode(
 //[yMultiplication] y方向放大倍数
 //[string] 文本
 // ignore: unused_element
-List<int> _tscText(
+Uint8List _tscText(
   int x,
   int y,
   String fontSize,
@@ -153,7 +153,7 @@ List<int> _tscText(
   int yMultiplication,
   String text,
 ) =>
-    gbk.encode(
+    utf8.encode(
         'TEXT $x,$y,"$fontSize",$rotation,$xMultiplication,$yMultiplication,"$text"\r\n');
 
 //图片文本
@@ -601,4 +601,102 @@ List<Uint8List> handleJsByteArray(dynamic jsData) {
     }
   }
   return list;
+}
+/// 简单测试版本 - 打印基本文本
+Future<List<Uint8List>> printSimpleTest() async {
+  List<Uint8List> commands = [];
+
+  // 1. 清空缓冲区
+  commands.add(_tscClearBuffer());
+
+  // 2. 设置标签参数 (110mm x 50mm)
+  commands.add(_tscSetup(75, 45, density: 10, speed: 4, sensorDistance: 2));
+
+  // 3. 设置代码页
+  commands.add(utf8.encode('CODEPAGE 936\r\n'));
+
+  // 4. 打印测试文本（使用多种字体测试）
+  // 使用大号内置字体
+  commands.add(utf8.encode('TEXT 10,10,"ht.TTF",0,1,1,"测试文本"\r\n'));
+
+  commands.add(utf8.encode('TEXT 10,50,"ht.ttf",0,1,1,"测试文本"\r\n'));
+
+  // 5. 设置切刀
+  commands.add(_tscCutter());
+
+  // 6. 执行打印
+  commands.add(_tscPrint());
+
+  return commands;
+}
+
+/// 打印中文文本到标签上，支持自动换行，不使用 _tscBitmap 和 _tscBitmapText
+/// [text] 要打印的中文文本
+/// 返回生成的TSC指令列表
+Future<List<Uint8List>> printChineseText(String text) async {
+  // 标签宽度为110mm
+  const labelWidth = 110;
+
+  // 定义文本区域的宽度（留出一些边距）
+  const textAreaWidthMm = 100; // 100mm的文本宽度
+  const textAreaWidthPx = textAreaWidthMm * _dpi; // 转换为像素单位
+
+  // 定义字体大小
+  const fontSize = 24.0;
+
+  // 对文本进行自动换行处理
+  List<String> lines = contextFormat(text, fontSize, textAreaWidthPx.toDouble());
+
+  // 计算标签高度（根据行数和字体大小）
+  const lineHeight = 32; // 每行高度约32像素(4mm)
+  int labelHeight = ((lines.length * lineHeight) + 32) ~/ _dpi; // 加上上下边距，转换为mm单位
+  // 确保最小高度
+  labelHeight = labelHeight > 30 ? labelHeight : 30;
+
+  // 构建TSC指令
+  List<Uint8List> commands = [];
+
+  // 1. 设置标签参数
+  commands.add(_tscSetup(labelWidth, labelHeight, density: 10, speed: 4, sensorDistance: 0));
+
+  // 2. 清空缓冲区
+  commands.add(_tscClearBuffer());
+
+  // 3. 设置代码页支持中文
+  commands.add(utf8.encode('CODEPAGE 936\r\n')); // 简体中文GBk编码
+
+  // 4. 使用TEXT指令打印每一行文本
+  const startX = 10; // 起始X坐标（点）
+  const startY = 10; // 起始Y坐标（点）
+
+  for (int i = 0; i < lines.length; i++) {
+    if (lines[i].isNotEmpty) {
+      int yPos = startY + (i * lineHeight); // 每行Y坐标（点）
+      try {
+        // 使用TEXT指令打印文本，使用UTF-8编码并通过UTF-8字体
+        String command = 'TEXT $startX,$yPos,"text.ttf",0,1,1,"${lines[i]}"\r\n';
+        commands.add(utf8.encode(command));
+      } catch (e) {
+        // fallback方案
+        try {
+          // 尝试使用GBK编码
+          commands.add(Uint8List.fromList(gbk.encode(
+              'TEXT $startX,$yPos,"text.ttf",0,1,1,"${lines[i]}"\r\n')));
+        } catch (e2) {
+          // 如果编码都失败，使用英文字符替代
+          String englishText = lines[i].replaceAll(RegExp(r'[\u4e00-\u9fa5]'), '?');
+          commands.add(utf8.encode(
+              'TEXT $startX,$yPos,"3",0,1,1,"$englishText"\r\n'));
+        }
+      }
+    }
+  }
+
+  // 5. 设置切刀
+  commands.add(_tscCutter());
+
+  // 6. 执行打印
+  commands.add(_tscPrint());
+
+  return commands;
 }

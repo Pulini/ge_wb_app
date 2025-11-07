@@ -141,7 +141,7 @@ class LivenFaceVerificationActivity : AppCompatActivity() {
         return MLLivenessDetectView.Builder()
             .setContext(this)
             .setOptions(MLLivenessDetectView.DETECT_MASK)
-            .setFaceFrameRect(Rect(0, 0, 0, 1000))
+            .setFaceFrameRect(Rect(0, 0, 0, 400))
             .setDetectCallback(object : OnMLLivenessDetectCallback {
                 //活体检测完成
                 override fun onCompleted(result: MLLivenessCaptureResult) {

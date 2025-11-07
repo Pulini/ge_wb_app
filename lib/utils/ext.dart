@@ -4,6 +4,9 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:decimal/decimal.dart';
+import 'package:dio/dio.dart';
+import 'package:ge_wb_app/do_http/response/base_data.dart';
+import 'package:ge_wb_app/utils/util.dart';
 
 extension Uint8ListExt on Uint8List {
   toHexString() {
@@ -25,6 +28,18 @@ extension Uint8ListExt on Uint8List {
 extension FileExt on File {
   //图片转 base64
   String toBase64() => base64Encode(readAsBytesSync());
+  Future<String> size() async {
+    var bytes= await length();
+    if (bytes < 1024) {
+      return '$bytes B';
+    } else if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(2)} KB';
+    } else if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+    } else {
+      return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+    }
+  }
 }
 
 //Double扩展方法
@@ -95,5 +110,35 @@ extension StringExt on String? {
 
   int hexToInt() {
     return int.parse(this ?? '', radix: 16);
+  }
+}
+extension RequestOptionsExt on RequestOptions {
+  print() {
+    Map<String, dynamic> map = <String, dynamic>{};
+    map['Type'] = '===发送请求===';
+    map['RequestTime'] = DateTime.now();
+    map['Method'] = method;
+    map['BaseUrl'] = baseUrl;
+    map['Path'] = path;
+    map['Headers'] = headers;
+    map['QueryParameters'] = queryParameters;
+    map['Data'] = data;
+    loggerF(map);
+  }
+}
+extension ApiResponseExtensions<T> on Response<T> {
+  BaseData getBaseData() {
+    var base = BaseData.fromJson(data);
+    Map<String, dynamic> map = <String, dynamic>{};
+    map['Type'] = '===收到响应===';
+    map['ResponseTime'] = DateTime.now();
+    map['BaseUrl'] = requestOptions.baseUrl;
+    map['Path'] = requestOptions.path;
+    map['Status'] = '$statusCode';
+    map['ResultCode'] = base.resultCode;
+    map['Data'] = base.data;
+    map['Message'] = base.message;
+    loggerF(map);
+    return base;
   }
 }

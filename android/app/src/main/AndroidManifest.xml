@@ -27,9 +27,9 @@
         tools:ignore="ProtectedPermissions" />
 
     <application
-        android:name="${applicationName}"
+        android:name="android.app.Application"
         android:icon="@mipmap/ic_launcher_round"
-        android:label="金帝WebBuilderApp">
+        android:label="金帝星链App">
 
         <activity
             android:name=".MainActivity"
